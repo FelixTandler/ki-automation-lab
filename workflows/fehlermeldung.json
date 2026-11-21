@@ -1,0 +1,65 @@
+{
+  "name": "Fehlermeldung (Error-Workflow)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "10d2e34a-4e96-410f-8b0e-3a88b7c5c1bd",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "sendTo": "warnung@example.com",
+        "subject": "=Fehler im Workflow: {{$json.workflow.name}}",
+        "emailType": "text",
+        "message": "=Ein Workflow ist fehlgeschlagen.\n\nFehler: {{ $json.execution.error.message }}\n\nLetzte Node: {{ $json.execution.lastNodeExecuted }}\n\nLink: {{ $json.execution.url }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "e82284ae-f6e0-4370-ab49-f86d979cea0e",
+      "name": "Send a message",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PLATZHALTER",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}

@@ -1,0 +1,459 @@
+{
+  "name": "Postfach-Assistent (Prototyp)",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "14730888-1e88-404d-9cd2-a7eeab635f4b",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "claude-sonnet-5-5",
+          "mode": "list",
+          "cachedResultName": "claude-sonnet-5-5"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Du bist Assistent der Muster Möbel GmbH (Tischlerei). Hier ist eine Kundenanfrage: {{ $json.Text }}\n\nAufgabe: Analysiere die Anfrage und antworte AUSSCHLIESSLICH mit gültigem JSON, ohne Text davor oder danach und ohne Codeblock. Verwende genau diese Felder:\n{\n  \"name\": \"\",\n  \"firma\": \"\",\n  \"anliegen\": \"\",\n  \"frist\": \"\",\n  \"kategorie\": \"Neuanfrage | Preisanfrage | Reklamation | Unklar\",\n  \"dringlichkeit\": \"hoch | normal\",\n  \"fehlende_angaben\": [\"maximal 3 Einträge\"],\n  \"antwort_betreff\": \"\",\n  \"antwort_text\": \"\"\n}\n\nRegeln:\n- Wenn etwas nicht genannt ist, schreibe \"nicht genannt\". Erfinde nichts.\n- Dringlichkeit \"hoch\" nur bei einer Reklamation oder wenn der Kunde ausdrücklich Eile signalisiert (zum Beispiel \"sofort\", \"dringend\", \"morgen\"), sonst \"normal\".\n- antwort_text: höflich, Deutsch, maximal 5 kurze Sätze. Trenne Anrede, Haupttext und Gruß durch eine Leerzeile (\\n\\n).\n- Anrede: \"Sehr geehrter Herr ...\" oder \"Sehr geehrte Frau ...\" nur, wenn das Geschlecht eindeutig aus dem Vornamen hervorgeht, sonst nur \"Guten Tag,\".\n- Bestätige den Eingang und stelle höchstens 3 Rückfragen.\n- Nenne keinen Preis und mache keine Liefer- und keine Zeitzusagen. Verwende im antwort_text nie die Wörter \"umgehend\", \"sofort\", \"schnellstmöglich\", \"zeitnah\" oder \"innerhalb von\".\n- Nur wenn der Kunde ausdrücklich nach dem Preis fragt: schreibe, dass der Preis im Angebot genannt wird.\n- Bei einer Reklamation: entschuldige dich persönlich, zum Beispiel \"Das tut uns leid, dass Ihr Schrank nicht in Ordnung ist.\" (Produkt anpassen), ohne Schuld einzugestehen, vermeide das Wort \"Beanstandung\", und nenne einen nächsten Schritt.\n- Unterschrift: \"Ihr Team der Muster Möbel GmbH\"."
+            }
+          ]
+        },
+        "options": {
+          "maxTokens": 4000
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.anthropic",
+      "typeVersion": 1,
+      "position": [
+        528,
+        0
+      ],
+      "id": "f34616cf-6984-4d70-9253-fb454899fa22",
+      "name": "Message a model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "PLATZHALTER",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const tests = [\n  \"Hallo, brauchen 10 Stühle. Wann geht das? Müller\",\n  \"Guten Tag, wir sind ein kleines Architekturbüro in Esslingen mit sechs Mitarbeitern und planen im Frühjahr einen Umzug. Der neue Raum hat 80 Quadratmeter, und wir suchen drei höhenverstellbare Schreibtische und einen Konferenztisch für acht Personen. Letztes Jahr haben wir schon einmal bei einem anderen Anbieter bestellt, das war leider nicht ideal. Können Sie uns ein Angebot machen? Die Möbel sollen bis Ende März da sein. Mit freundlichen Grüßen, Petra Lang, Lang Architekten\",\n  \"Guten Tag, wir hätten da mal was wegen unserem Büro. Können Sie sich melden? Gruß, K. Schmidt\",\n  \"Was kostet ein Esstisch aus Eiche für 8 Personen? Brauchen wir bis Weihnachten. Familie Weber\",\n  \"Der Schrank, den wir vor 3 Wochen bekommen haben, hat einen Kratzer an der Tür und ein Scharnier hängt. Das ist inakzeptabel! Bitte sofort melden. Thomas Berger, Berger GmbH\"\n];\n\n// Welcher Test soll laufen? 0 = Müller, 1 = Lang, 2 = Schmidt, 3 = Weber, 4 = Berger, \"alle\" = alle fünf\nconst auswahl = 4;\n\nif (auswahl === \"alle\") {\n  return tests.map(t => ({ json: { Text: t } }));\n}\nreturn [{ json: { Text: tests[auswahl] } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "07d37d28-27d0-4e0e-a951-4dbb2462f6d4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  const block = (item.json.content || []).find(c => c.type === \"text\");\n  const raw = block ? block.text : \"\";\n  let email = \"\";\n  try {\n    email = $('On form submission').first().json['E-Mail'] || \"\";\n  } catch (e) {\n    email = \"\";\n  }\n  const start = raw.indexOf(\"{\");\n  const end = raw.lastIndexOf(\"}\");\n  try {\n    const d = JSON.parse(raw.slice(start, end + 1));\n    d.fehlende_angaben = Array.isArray(d.fehlende_angaben) ? d.fehlende_angaben.join(\"; \") : d.fehlende_angaben;\n    d.email = email;\n    d.eingang = new Date().toISOString();\n    d.status = \"neu\";\n    return { json: d };\n  } catch (e) {\n    return { json: { fehler: \"JSON nicht lesbar\", roh: raw, email: email, eingang: new Date().toISOString(), status: \"Fehler\" } };\n  }\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        0
+      ],
+      "id": "367fff0b-f8e6-4a1d-ac0e-3165293f5343",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "formTitle": "Anfrage an Muster Möbel",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Text",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "E-Mail",
+              "fieldType": "email",
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        -160
+      ],
+      "id": "b772c0c7-7ea7-45c9-8a4b-dc34533fbd13",
+      "name": "On form submission"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "PLATZHALTER",
+          "mode": "list",
+          "cachedResultName": "anfragen"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "firma",
+              "displayName": "firma",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "anliegen",
+              "displayName": "anliegen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "frist",
+              "displayName": "frist",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "kategorie",
+              "displayName": "kategorie",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "dringlichkeit",
+              "displayName": "dringlichkeit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fehlende_angaben",
+              "displayName": "fehlende_angaben",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "antwort_betreff",
+              "displayName": "antwort_betreff",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "antwort_text",
+              "displayName": "antwort_text",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "eingang",
+              "displayName": "eingang",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "fehler",
+              "displayName": "fehler",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "roh",
+              "displayName": "roh",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        0
+      ],
+      "id": "c954c558-7459-4267-bd85-6c9703454c1b",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "be93e8ac-3385-4e93-a206-42359cf72d60",
+              "leftValue": "={{ $json.dringlichkeit }}",
+              "rightValue": "hoch",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "1e06cc29-d186-45ab-a1dd-80080aca8ecc",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.antwort_betreff }}",
+        "message": "={{ $json.antwort_text }}",
+        "options": {
+          "sendTo": "={{ $json.email }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        0
+      ],
+      "id": "1806855f-a537-406f-9c21-dfba2a7801a5",
+      "name": "Create a draft",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PLATZHALTER",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "warnung@example.com",
+        "subject": "=Dringende Anfrage:  {{ $('Insert row').item.json.firma }}",
+        "emailType": "text",
+        "message": "=Dringende Anfrage eingegangen. \nKunde: {{ $('Insert row').item.json.name }}, {{ $('Insert row').item.json.firma }} \nKategorie: {{ $('Insert row').item.json.kategorie }} \nAnliegen: {{ $('Insert row').item.json.anliegen }} \nFrist: {{ $('Insert row').item.json.frist }} \nDer Antwortentwurf liegt in den Gmail-Entwürfen. ",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1600,
+        -160
+      ],
+      "id": "7aac80ea-d06a-4795-809f-9933c330c667",
+      "name": "Send a message",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "PLATZHALTER",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert row": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Create a draft": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "nodeGroups": [],
+  "tags": []
+}
