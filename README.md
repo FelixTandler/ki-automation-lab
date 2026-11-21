@@ -21,6 +21,12 @@ Der Workflow liest eine Anfrage, lässt Claude sie als strukturiertes JSON auswe
 6. Gmail legt den Antwortentwurf als **Entwurf** an (wird nicht gesendet)
 7. Separater Fehler-Workflow „Fehlermeldung“ schickt bei einem Workflow-Fehler eine Mail
 
+![Workflow Postfach-Assistent](docs/screenshots/workflow-postfach-assistent.png)
+
+Fehler-Workflow:
+
+![Workflow Fehlermeldung](docs/screenshots/workflow-fehlermeldung.png)
+
 ## Technik
 
 - n8n (lokal, per `npx n8n`)
@@ -31,6 +37,12 @@ Der Workflow liest eine Anfrage, lässt Claude sie als strukturiertes JSON auswe
 ## Tests
 
 Der manuelle Test enthält 5 erfundene Beispielanfragen (unklare Anfrage, Neuanfrage, Preisanfrage, Reklamation, vage Anfrage). Es gibt **noch keine systematische Auswertung** und keine Trefferquote.
+
+Beispielausgabe der Data Table `anfragen` (erfundene Anfragen):
+
+![Tabelle anfragen, Teil 1](docs/screenshots/tabelle-anfragen-1.png)
+
+![Tabelle anfragen, Teil 2](docs/screenshots/tabelle-anfragen-2.png)
 
 ## Grenzen
 
